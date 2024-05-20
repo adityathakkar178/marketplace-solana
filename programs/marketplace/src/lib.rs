@@ -11,7 +11,7 @@ use {
         token::{mint_to, Mint, MintTo, Token, TokenAccount},
     },
 };
-declare_id!("6SoLn7evYbz9YPHCyh5CsVifCax3WhZwUFoc9Vyaoqoi");
+declare_id!("2CA7hmQQFyQoPcFoCMd1pCzZDxth6pnx7ehNLavKKaim");
 
 #[program]
 pub mod marketplace {
