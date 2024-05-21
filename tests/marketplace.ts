@@ -10,12 +10,45 @@ describe('Mint Nfts', () => {
   const payer = provider.wallet;
   const program = anchor.workspace.Marketplace;
 
+  const collectionMetadata = {
+    name: 'Collection1',
+    symbol: 'CXYZ',
+    uri: 'collectionxyz',
+  };
+
   const metadata = {
       name: 'XYZ',
       symbol: 'ABC',
       uri: 'abcxyz',
-      collection: Keypair.generate().publicKey,
   };
+
+  let collectionMintKeyPair: Keypair;
+
+  it('Mint Collection', async () => {
+    collectionMintKeyPair = Keypair.generate();    
+
+    const collectionAssociatedTokenAccountAddress = getAssociatedTokenAddressSync(
+      collectionMintKeyPair.publicKey,
+      payer.publicKey
+    );
+
+    const collectionTransactionSignature = await program.methods
+      .mintCollection(
+        collectionMetadata.name,
+        collectionMetadata.symbol,
+        collectionMetadata.uri,
+      )
+      .accounts({
+        payer: payer.publicKey,
+        collectionMintAccount: collectionMintKeyPair.publicKey,
+        collectionAssociatedTokenAccount: collectionAssociatedTokenAccountAddress,
+      })
+      .signers([collectionMintKeyPair])
+      .rpc({ skipPreflight: true });
+
+    console.log('Success');
+    console.log('Transaction signature', collectionTransactionSignature);
+  });
 
   it('Mint Nft with collections', async () => {
       const mintKeyPair = Keypair.generate();
@@ -30,12 +63,13 @@ describe('Mint Nfts', () => {
               metadata.name,
               metadata.symbol,
               metadata.uri,
-              metadata.collection
+              collectionMintKeyPair.publicKey
           )
           .accounts({
               payer: payer.publicKey,
               mintAccount: mintKeyPair.publicKey,
               associatedTokenAccount: associatedTokenAccountAddress,
+              collectionMetadata: collectionMintKeyPair.publicKey
           })
           .signers([mintKeyPair])
           .rpc({ skipPreflight: true });
