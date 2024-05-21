@@ -5,8 +5,9 @@ use {
     anchor_spl::{
         associated_token::AssociatedToken,
         metadata::{
-            create_metadata_accounts_v3, mpl_token_metadata::types::{DataV2, Collection},
-            CreateMetadataAccountsV3, Metadata,
+            create_master_edition_v3, create_metadata_accounts_v3,
+            mpl_token_metadata::types::{Collection, DataV2},
+            CreateMasterEditionV3, CreateMetadataAccountsV3, Metadata,
         },
         token::{mint_to, Mint, MintTo, Token, TokenAccount},
     },
@@ -72,6 +73,26 @@ pub mod marketplace {
             None,
         )?;
 
+        msg!("Creating master edition account");
+
+        create_master_edition_v3(
+            CpiContext::new(
+                ctx.accounts.token_metadata_program.to_account_info(),
+                CreateMasterEditionV3 {
+                    edition: ctx.accounts.edition_account.to_account_info(),
+                    mint: ctx.accounts.mint_account.to_account_info(),
+                    update_authority: ctx.accounts.payer.to_account_info(),
+                    mint_authority: ctx.accounts.payer.to_account_info(),
+                    payer: ctx.accounts.payer.to_account_info(),
+                    metadata: ctx.accounts.metadata_account.to_account_info(),
+                    token_program: ctx.accounts.token_program.to_account_info(),
+                    system_program: ctx.accounts.system_program.to_account_info(),
+                    rent: ctx.accounts.rent.to_account_info(),
+                },
+            ),
+            None,
+        )?;
+
         msg!("NFT minted successfully");
 
         Ok(())
@@ -91,6 +112,15 @@ pub struct CreateToken<'info> {
         seeds::program = token_metadata_program.key(),
     )]
     pub metadata_account: UncheckedAccount<'info>,
+
+    /// CHECK: Validate address by deriving pda
+    #[account(
+        mut,
+        seeds = [b"metadata", token_metadata_program.key().as_ref(), mint_account.key().as_ref(), b"edition"],
+        bump,
+        seeds::program = token_metadata_program.key(),
+    )]
+    pub edition_account: UncheckedAccount<'info>,
 
     #[account(
         init,
