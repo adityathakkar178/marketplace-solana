@@ -5,7 +5,7 @@ use {
     anchor_spl::{
         associated_token::AssociatedToken,
         metadata::{
-            create_metadata_accounts_v3, mpl_token_metadata::types::DataV2,
+            create_metadata_accounts_v3, mpl_token_metadata::types::{DataV2, Collection},
             CreateMetadataAccountsV3, Metadata,
         },
         token::{mint_to, Mint, MintTo, Token, TokenAccount},
@@ -22,6 +22,7 @@ pub mod marketplace {
         nft_name: String,
         nft_symbol: String,
         nft_uri: String,
+        collection_address: Pubkey,
     ) -> Result<()> {
         msg!("Minting Tokens");
 
@@ -38,6 +39,11 @@ pub mod marketplace {
         )?;
 
         msg!("Creating metadata account");
+
+        let collection = Collection {
+            verified: false,
+            key: collection_address,
+        };
 
         create_metadata_accounts_v3(
             CpiContext::new(
@@ -58,7 +64,7 @@ pub mod marketplace {
                 uri: nft_uri,
                 seller_fee_basis_points: 0,
                 creators: None,
-                collection: None,
+                collection: Some(collection),
                 uses: None,
             },
             false,
