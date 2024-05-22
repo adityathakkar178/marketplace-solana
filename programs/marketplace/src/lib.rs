@@ -9,13 +9,16 @@ use {
             mpl_token_metadata::types::{Collection, DataV2},
             CreateMasterEditionV3, CreateMetadataAccountsV3, Metadata,
         },
-        token::{mint_to, Mint, MintTo, Token, TokenAccount},
+        token::{mint_to, Mint, MintTo, Token, TokenAccount, Transfer},
     },
 };
+
 declare_id!("2CA7hmQQFyQoPcFoCMd1pCzZDxth6pnx7ehNLavKKaim");
 
 #[program]
 pub mod marketplace {
+    use anchor_spl::token;
+
     use super::*;
 
     pub fn mint_collection(
@@ -174,6 +177,31 @@ pub mod marketplace {
 
         Ok(())
     }
+
+    pub fn list_nft_for_sale(ctx: Context<ListNftForSale>, price: u64) -> Result<()> {
+        msg!("List nft for sale");
+
+        let pda_account = &mut ctx.accounts.pda_account;
+
+        token::transfer(
+            CpiContext::new(
+                ctx.accounts.token_program.to_account_info(),
+                Transfer {
+                    from: ctx.accounts.seller_token_account.to_account_info(),
+                    to: ctx.accounts.pda_token_account.to_account_info(),
+                    authority: ctx.accounts.seller.to_account_info(),
+                },
+            ),
+            1,
+        )?;
+
+        pda_account.price = price;
+        pda_account.seller = ctx.accounts.seller.key();
+
+        msg!("Nft lsited for sale");
+
+        Ok(())
+    }
 }
 
 #[derive(Accounts)]
@@ -266,6 +294,53 @@ pub struct CreateCollection<'info> {
     pub token_program: Program<'info, Token>,
     pub token_metadata_program: Program<'info, Metadata>,
     pub associated_token_program: Program<'info, AssociatedToken>,
+    pub system_program: Program<'info, System>,
+    pub rent: Sysvar<'info, Rent>,
+}
+
+#[account]
+pub struct Sale {
+    pub seller: Pubkey,
+    pub price: u64,
+}
+
+#[derive(Accounts)]
+pub struct ListNftForSale<'info> {
+    #[account(mut)]
+    pub seller: Signer<'info>,
+
+    #[account(mut)]
+    pub seller_token_account: Account<'info, TokenAccount>,
+
+    #[account(
+        init,
+        payer = seller,
+        space = 8 + 32 + 8,
+        seeds = [b"sale", mint.key().as_ref()],
+        bump,
+    )]
+    pub pda_account: Account<'info, Sale>,
+
+    #[account(
+        init_if_needed,
+        payer = seller,
+        associated_token::mint = mint,
+        associated_token::authority = pda_signer,
+    )]
+    pub pda_token_account: Account<'info, TokenAccount>,
+
+    #[account(mut)]
+    pub mint: Account<'info, Mint>,
+
+    /// CHECK: Validate address by deriving pda
+    #[account(
+        seeds = [b"sale", mint.key().as_ref()],
+        bump,
+    )]
+    pub pda_signer: AccountInfo<'info>,
+
+    pub associated_token_program: Program<'info, AssociatedToken>,
+    pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
     pub rent: Sysvar<'info, Rent>,
 }

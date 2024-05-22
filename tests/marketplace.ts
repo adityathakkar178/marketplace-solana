@@ -1,10 +1,10 @@
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import { Marketplace } from "../target/types/marketplace";
-import { Keypair } from "@solana/web3.js";
-import { getAssociatedTokenAddressSync } from "@solana/spl-token";
+import { Keypair, PublicKey } from "@solana/web3.js";
+import { TOKEN_PROGRAM_ID, createAssociatedTokenAccountInstruction, getAccount, getAssociatedTokenAddressSync } from "@solana/spl-token";
 
-describe('Mint Nfts', () => {
+describe('Marketplace', () => {
   const provider = anchor.AnchorProvider.env();
   anchor.setProvider(provider);
   const payer = provider.wallet;
@@ -23,6 +23,7 @@ describe('Mint Nfts', () => {
   };
 
   let collectionMintKeyPair: Keypair;
+  let mintKeyPair: Keypair;
 
   it('Mint Collection', async () => {
     collectionMintKeyPair = Keypair.generate();    
@@ -46,13 +47,13 @@ describe('Mint Nfts', () => {
       .signers([collectionMintKeyPair])
       .rpc({ skipPreflight: true });
 
-    console.log('Success');
+    console.log('Collection created');
     console.log('Transaction signature', collectionTransactionSignature);
   });
 
   it('Mint Nft with collections', async () => {
-      const mintKeyPair = Keypair.generate();
-
+      mintKeyPair = Keypair.generate();
+      
       const associatedTokenAccountAddress = getAssociatedTokenAddressSync(
           mintKeyPair.publicKey,
           payer.publicKey
@@ -74,7 +75,54 @@ describe('Mint Nfts', () => {
           .signers([mintKeyPair])
           .rpc({ skipPreflight: true });
 
-      console.log('Success');
+      console.log('NFT minted');
       console.log('Transaction signature', transactionSignature);
+  });
+
+  it('List token for sale', async () => {
+    const sellerTokenAccount = getAssociatedTokenAddressSync(
+      mintKeyPair.publicKey,
+      payer.publicKey
+    );
+
+    const [pdaAccount, bump] = PublicKey.findProgramAddressSync(
+      [Buffer.from("sale"), mintKeyPair.publicKey.toBuffer()],
+      program.programId
+    );
+
+    const pdaTokenAccountAddress = getAssociatedTokenAddressSync(
+      mintKeyPair.publicKey,
+      pdaAccount,
+      true
+    );
+
+    const createPdaTokenAccountIx = createAssociatedTokenAccountInstruction(
+      payer.publicKey,
+      pdaTokenAccountAddress,
+      pdaAccount,
+      mintKeyPair.publicKey
+    );
+
+    const listTransactionSignature = await program.methods
+      .listNftForSale(new anchor.BN(1000000000))
+      .accounts({
+        seller: payer.publicKey,
+        sellerTokenAccount: sellerTokenAccount,
+        pdaAccount,
+        pdaTokenAccount: pdaTokenAccountAddress,
+        mint: mintKeyPair.publicKey,
+        pdaSigner: pdaAccount,
+        tokenProgram: TOKEN_PROGRAM_ID,
+      })
+      .preInstructions([createPdaTokenAccountIx])
+      .signers([])
+      .rpc({ skipPreflight: true });
+
+    console.log('NFT listed for sale');
+    console.log('Transaction signature', listTransactionSignature);
+
+    // const pdaTokenAccount = await getAccount(provider.connection, pdaTokenAccountAddress);
+    // console.log('PDA token account balance:', pdaTokenAccount.amount.toString());
+    // console.log(pdaTokenAccountAddress);
   });
 });
