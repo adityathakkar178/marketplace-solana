@@ -202,6 +202,31 @@ pub mod marketplace {
 
         Ok(())
     }
+
+    pub fn buy_nft(ctx: Context<BuyNft>) -> Result<()> {
+        msg!("Buying nft");
+
+        let pda_account = &ctx.accounts.pda_account;
+        let seller = &ctx.accounts.seller;
+        let buyer = &ctx.accounts.buyer;
+
+        token::transfer(
+            CpiContext::new(
+                ctx.accounts.token_program.to_account_info(),
+                Transfer {
+                    from: ctx.accounts.pda_token_account.to_account_info(),
+                    to: ctx.accounts.buyer_token_account.to_account_info(),
+                    authority: ctx.accounts.pda_signer.to_account_info(),
+                },
+            ),
+            1,
+        )?;
+
+        **seller.to_account_info().try_borrow_mut_lamports()? += pda_account.price;
+        **buyer.to_account_info().try_borrow_mut_lamports()? -= pda_account.price;
+
+        Ok(())
+    }
 }
 
 #[derive(Accounts)]
@@ -343,4 +368,36 @@ pub struct ListNftForSale<'info> {
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
     pub rent: Sysvar<'info, Rent>,
+}
+
+#[derive(Accounts)]
+pub struct BuyNft<'info> {
+    #[account(mut)]
+    pub buyer: Signer<'info>,
+
+    #[account(mut)]
+    pub buyer_token_account: Account<'info, TokenAccount>,
+
+    /// CHECK: Validate address by deriving pda
+    #[account(mut)]
+    pub seller: UncheckedAccount<'info>,
+
+    #[account(mut)]
+    pub pda_account: Account<'info, Sale>,
+
+    #[account(mut)]
+    pub pda_token_account: Account<'info, TokenAccount>,
+
+    #[account(mut)]
+    pub mint: Account<'info, Mint>,
+
+    /// CHECK: Validate address by deriving pda
+    #[account(
+        seeds = [b"sale", mint.key().as_ref()],
+        bump,
+    )]
+    pub pda_signer: AccountInfo<'info>,
+
+    pub token_program: Program<'info, Token>,
+    pub system_program: Program<'info, System>,
 }
