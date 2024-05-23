@@ -193,4 +193,51 @@ describe('Marketplace', () => {
         console.log('NFT purchased');
         console.log('Transaction signature', buyTransactionSignature);
     });
+
+    it('Withdraw NFT', async () => {
+        const sellerTokenAccount = getAssociatedTokenAddressSync(
+            mintKeyPair.publicKey,
+            payer.publicKey
+        );
+
+        const [pdaAccount, bump] = PublicKey.findProgramAddressSync(
+            [Buffer.from('sale'), mintKeyPair.publicKey.toBuffer()],
+            program.programId
+        );
+
+        const pdaTokenAccountAddress = getAssociatedTokenAddressSync(
+            mintKeyPair.publicKey,
+            pdaAccount,
+            true
+        );
+
+        const createPdaTokenAccountIx = createAssociatedTokenAccountInstruction(
+            payer.publicKey,
+            pdaTokenAccountAddress,
+            pdaAccount,
+            mintKeyPair.publicKey
+        );
+        const createTransaction = new Transaction().add(
+            createPdaTokenAccountIx
+        );
+        await provider.sendAndConfirm(createTransaction, []);
+
+        const withdrawTransactionSignature = await program.methods
+            .withdrawNft()
+            .accounts({
+                seller: payer.publicKey,
+                sellerTokenAccount: sellerTokenAccount,
+                pdaAccount,
+                pdaTokenAccount: pdaTokenAccountAddress,
+                mint: mintKeyPair.publicKey,
+                pdaSigner: pdaAccount,
+                tokenProgram: TOKEN_PROGRAM_ID,
+                systemProgram: SystemProgram.programId,
+            })
+            .signers([])
+            .rpc({ skipPreflight: true });
+
+        console.log('NFT withdrawn');
+        console.log('Transaction signature', withdrawTransactionSignature);
+    });
 });

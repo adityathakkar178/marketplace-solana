@@ -263,7 +263,7 @@ pub mod marketplace {
             CpiContext::new_with_signer(
                 ctx.accounts.token_program.to_account_info(),
                 Transfer {
-                    from: ctx.accounts.pda_account.to_account_info(),
+                    from: ctx.accounts.pda_token_account.to_account_info(),
                     to: ctx.accounts.seller_token_account.to_account_info(),
                     authority: ctx.accounts.pda_signer.to_account_info(),
                 },
