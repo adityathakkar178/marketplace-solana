@@ -239,6 +239,10 @@ pub mod marketplace {
             pda_account.price,
         )?;
 
+        ctx.accounts.pda_account.close(ctx.accounts.seller.to_account_info())?;
+
+        msg!("NFT purchased");
+
         Ok(())
     }
 }
