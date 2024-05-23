@@ -239,9 +239,44 @@ pub mod marketplace {
             pda_account.price,
         )?;
 
-        ctx.accounts.pda_account.close(ctx.accounts.seller.to_account_info())?;
+        ctx.accounts
+            .pda_account
+            .close(ctx.accounts.seller.to_account_info())?;
 
         msg!("NFT purchased");
+
+        Ok(())
+    }
+
+    pub fn withdraw_nft(ctx: Context<WithdrawNFT>) -> Result<()> {
+        msg!("Withdrawing Nft");
+
+        let pda_account = &mut ctx.accounts.pda_account;
+
+        require!(pda_account.price > 0, ErrorCode::NftAlreadySold);
+
+        let bump = &[ctx.bumps.pda_signer];
+        let binding = ctx.accounts.mint.key();
+        let signer_seeds = &[&[b"sale", binding.as_ref(), bump][..]];
+
+        token::transfer(
+            CpiContext::new_with_signer(
+                ctx.accounts.token_program.to_account_info(),
+                Transfer {
+                    from: ctx.accounts.pda_account.to_account_info(),
+                    to: ctx.accounts.seller_token_account.to_account_info(),
+                    authority: ctx.accounts.pda_signer.to_account_info(),
+                },
+                signer_seeds,
+            ),
+            1,
+        )?;
+
+        ctx.accounts
+            .pda_account
+            .close(ctx.accounts.seller.to_account_info())?;
+
+        msg!("NFT withdrawn successfully");
 
         Ok(())
     }
@@ -418,4 +453,43 @@ pub struct BuyNft<'info> {
 
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct WithdrawNFT<'info> {
+    #[account(mut)]
+    pub seller: Signer<'info>,
+
+    #[account(mut)]
+    pub seller_token_account: Account<'info, TokenAccount>,
+
+    #[account(
+        mut,
+        close = seller,
+        seeds = [b"sale", mint.key().as_ref()],
+        bump
+    )]
+    pub pda_account: Account<'info, Sale>,
+
+    #[account(mut)]
+    pub pda_token_account: Account<'info, TokenAccount>,
+
+    #[account(mut)]
+    pub mint: Account<'info, Mint>,
+
+    /// CHECK: Validate address by deriving pda
+    #[account(
+        seeds = [b"sale", mint.key().as_ref()],
+        bump,
+    )]
+    pub pda_signer: AccountInfo<'info>,
+
+    pub token_program: Program<'info, Token>,
+    pub system_program: Program<'info, System>,
+}
+
+#[error_code]
+pub enum ErrorCode {
+    #[msg("NFT has already been sold")]
+    NftAlreadySold,
 }
