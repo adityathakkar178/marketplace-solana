@@ -17,6 +17,7 @@ declare_id!("2CA7hmQQFyQoPcFoCMd1pCzZDxth6pnx7ehNLavKKaim");
 
 #[program]
 pub mod marketplace {
+    use anchor_lang::system_program;
     use anchor_spl::token;
 
     use super::*;
@@ -210,20 +211,33 @@ pub mod marketplace {
         let seller = &ctx.accounts.seller;
         let buyer = &ctx.accounts.buyer;
 
+        let bump = &[ctx.bumps.pda_signer];
+        let binding = ctx.accounts.mint.key();
+        let signer_seeds = &[&[b"sale", binding.as_ref(), bump][..]];
+
         token::transfer(
-            CpiContext::new(
+            CpiContext::new_with_signer(
                 ctx.accounts.token_program.to_account_info(),
                 Transfer {
                     from: ctx.accounts.pda_token_account.to_account_info(),
                     to: ctx.accounts.buyer_token_account.to_account_info(),
                     authority: ctx.accounts.pda_signer.to_account_info(),
                 },
+                signer_seeds,
             ),
             1,
         )?;
 
-        **seller.to_account_info().try_borrow_mut_lamports()? += pda_account.price;
-        **buyer.to_account_info().try_borrow_mut_lamports()? -= pda_account.price;
+        system_program::transfer(
+            CpiContext::new(
+                ctx.accounts.system_program.to_account_info(),
+                system_program::Transfer {
+                    from: buyer.to_account_info(),
+                    to: seller.to_account_info(),
+                },
+            ),
+            pda_account.price,
+        )?;
 
         Ok(())
     }
